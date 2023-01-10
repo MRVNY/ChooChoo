@@ -5,6 +5,7 @@ from tensorflow.keras import layers
 from scipy.stats import entropy
 from scipy import signal
 import scipy as sp
+from functools import reduce
 
 from helper import *
 
@@ -74,6 +75,17 @@ class LSTMAgent():
         timetable = np.array([self.env.agents[self.agent_id].earliest_departure, self.env.agents[self.agent_id].latest_arrival])
         
         return np.concatenate((map, pos_dir, target, action_onehot, timetable, np.array([reward,timestep]))).reshape(1,self.nb_inputs)
+    
+    def to_base_10(self, list):
+        return reduce(lambda x,y: (x<<1) + y, list)
+    
+    def condense_map(self, obs):
+        map = np.int32(obs[0][0])
+        return np.apply_along_axis(self.to_base_10, 2, map)
+        # out2 = np.zeros((30,30))
+        # for i in range(30):
+        #     for j in range(30):
+        #         out2[i,j] = reduce(lambda x,y: (x<<1) + y, map[i,j])
     
     def LSTM_Model(self):
         inputs = layers.Input(shape=(self.nb_inputs))
