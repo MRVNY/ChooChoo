@@ -9,30 +9,6 @@ from functools import reduce
 
 from helper import *
 
-TRANSITION_MAPS = 0
-AGENT_STATES = 1
-AGENT_TARGETS = 2
-
-MY_POS_DIR = 0
-OTHER_POS_DIR = 1
-MALFUNCTIONS = 2
-FRAC_SPEEDS = 3
-NUM_AGENTS_WITH_ME = 4
-
-NOTHING = 0
-LEFT = 1
-FOWARD = 2
-RIGHT = 3
-STOP = 4
-
-action_map = {
-    NOTHING: "nothing",
-    LEFT: "left",
-    FOWARD: "foward",
-    RIGHT: "right",
-    STOP: "stop"
-}
-
 class LSTMAgent():
     def __init__(self, 
                  learning_rate, gamma, beta_v, beta_e,  #loss func
@@ -97,7 +73,7 @@ class LSTMAgent():
         critic = layers.Dense(1)(common)
 
         model = keras.Model(inputs=[inputs,state_h,state_c], outputs=[action, critic, states], )
-        optimizer = keras.optimizers.RMSprop(learning_rate=self.learning_rate)
+        optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
         
         return model, optimizer
 
@@ -141,8 +117,9 @@ class LSTMAgent():
                 next_obs, all_rewards, dones, _ = self.env.step({self.agent_id: NOTHING})
                 reward = all_rewards[self.agent_id]
                 done = dones[0]
+                timestep = 0
             
-                for timestep in range(self.nb_trials):
+                while True:
                     input = self.prepare_input(next_obs, self.agent_id, action_onehot, reward, timestep)
                     
                     # Predict action probabilities and estimated future rewards from environment state
@@ -159,16 +136,38 @@ class LSTMAgent():
                     action_distribution.append(action)
 
                     # Apply the sampled action in our environment
-                    next_obs, all_rewards, dones, _ = self.env.step({self.agent_id: action})
+                    next_obs, all_rewards, dones, info = self.env.step({self.agent_id: action})
                     reward = all_rewards[self.agent_id]
                     done = dones[0]
+                    
+                    # if action == STOP:
+                    #     reward -= 1
+                        
+                    # # Reward 100 for DONE
+                    # if info['state'][0] == TrainState.DONE:
+                    #     #print(rewards_history)
+                    #     # print(info['state'][0])
+                    #     rewards_history[-1] += 100
+                    
+                    # # Punish increase as time goes on
+                    # if rewards_history[-1] < 0:
+                    #     rewards_history[-1] *= 1 + episode / self.nb_episodes
+                        
+                    # normalize rewards
+                    reward = reward / self.env._max_episode_steps
+                
                     rewards_history.append(reward)
                     
                     # entropy
                     entropy += sp.stats.entropy(action_probs)
                     
-                    if done: break
+                    timestep += 1
+                    if done or timestep == self.nb_trials:
+                        break
                     
+                # for i in range(self.nb_actions):
+                #     if action_distribution.count(i) > timestep/2:
+                #         rewards_history[-1] -= (action_distribution.count(i) - timestep/2)/self.env._max_episode_steps
                 
                 total_loss, actor_loss, critic_loss, entropy_loss = self.compute_loss(
                     tf.convert_to_tensor(action_probs_history,dtype=tf.float32), 
@@ -190,48 +189,8 @@ class LSTMAgent():
                     tf.summary.histogram('game/action_distribution', action_distribution, step=episode)
                 
             # Checkpoint
-            if episode % 2000 == 0:
+            if episode % 1000 == 0:
                 checkpoint = tf.train.Checkpoint(self.model)
                 checkpoint.save(self.ckpt_dir+'checkpoints_'+str(episode)+'/two_steps.ckpt')
                 
         self.model.save(self.path+'/model.h5')
-
-    # def test(self, test_model=None, nb_trials=100):
-    #     #test_summary_writer = tf.summary.create_file_writer(self.test_dir)
-
-    #     next_obs, _ = self.env.reset()
-    #     print(self.env.agents[0].earliest_departure)
-    #     print(self.env.agents[0].latest_arrival)
-    #     score = 0
-    #     reward = 0.0
-    #     action_onehot = np.zeros((self.nb_actions))
-    #     cell_state = [tf.zeros((1,self.nb_hidden)),tf.zeros((1,self.nb_hidden))]
-            
-    #     for step in range(100):
-    #         input = prepare_input(next_obs, self.agent_id, action_onehot,reward)
-            
-    #         action_probs, critic_value, cell_state = self.model([input,cell_state[0],cell_state[1]])
-            
-    #         action_probs = tf.squeeze(action_probs)
-    #         action = np.random.choice(self.nb_actions, p=action_probs.numpy())
-    #         action_onehot = np.zeros((self.nb_actions))
-    #         action_onehot[action] = 1
-
-    #         next_obs, all_rewards, dones, _ = self.env.step({self.agent_id: action})
-
-    #         for agent_handle in self.env.get_agent_handles():
-    #             score += all_rewards[agent_handle]
-
-    #         render_env(env)
-    #         print('Timestep {}, action = {}, total score = {}'.format(step, action_map[action], score))
-    #         tf.print(action_probs)
-
-    #         if dones['__all__']:
-    #             print('All done!')
-    #             return        
-
-    #         # with test_summary_writer.as_default():
-    #         #     tf.summary.scalar('loss/entropy', entropy, step=episode)
-    #         #     tf.summary.scalar('game/reward', np.sum(rewards_history), step=episode)
-    #         #     tf.summary.histogram('game/action_probs', action_probs_history, step=episode)
-                
