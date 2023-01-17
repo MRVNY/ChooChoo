@@ -460,7 +460,7 @@ if __name__ == "__main__":
     env_params = [
         {
             # Test_0
-            "n_agents": 5,
+            "n_agents": 1,
             "x_dim": 30,
             "y_dim": 30,
             "n_cities": 2,
@@ -471,7 +471,7 @@ if __name__ == "__main__":
         },
         {
             # Test_1
-            "n_agents": 10,
+            "n_agents": 1,
             "x_dim": 30,
             "y_dim": 30,
             "n_cities": 2,
@@ -482,7 +482,7 @@ if __name__ == "__main__":
         },
         {
             # Test_2
-            "n_agents": 20,
+            "n_agents": 1,
             "x_dim": 30,
             "y_dim": 30,
             "n_cities": 3,
