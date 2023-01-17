@@ -204,6 +204,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         for agent in train_env.get_agent_handles():
             if obs[agent]:
                 agent_obs[agent] = normalize_observation(obs[agent], observation_tree_depth, observation_radius=observation_radius)
+                # TODO change tree to global
                 agent_prev_obs[agent] = agent_obs[agent].copy()
 
         # Run episode
